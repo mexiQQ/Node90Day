@@ -23,6 +23,48 @@ node 是单线程的非同步I/O的
 
 ### node异步编程的劣势
 
+1. 异常处理
+
+try/catch/default模式只能检测事件循环的异常，而异步编程和基于事件的模式导致了很多事件（回调函数）在后一个或者后面某个事件循环中执行，所以不活不到
+
+那么问题来了，如何对这种异常进行检测呢？
+
+node提供了一些自己编写异步方法的原则：
+
+- 必须执行掉入者传入的回调函数
+- 如果发生异常要传递回异常供调用者判断
+
+给出一个的例子：
+
+var interview = function(callback){
+  process.nextTick(function(){
+    var resutlt = something;
+    if(error){
+      callback(error);
+    }else{
+      callback(null,result);
+    }
+  })
+}
+
+给出一个读取本地配置文件的示例：
+var fs = require('fs');
+var readLocalSetting = function(callback){
+  //node读取本地文件本来就有个异步方法
+  fs.redFile('/etc/setting', function (err, data) {
+  if (err) callback(err);
+    callback(null,data);
+  });
+}
+
+
+
+
+
+
+
+
+
 
 
 
