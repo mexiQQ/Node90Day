@@ -25,46 +25,75 @@ node 是单线程的非同步I/O的
 
 1. 异常处理
 
-try/catch/default模式只能检测事件循环的异常，而异步编程和基于事件的模式导致了很多事件（回调函数）在后一个或者后面某个事件循环中执行，所以不活不到
+ try/catch/default 模式只能检测事件循环的异常，而异步编程和基于事件的模式导致了很多事件（回调函数）在后一个或者后面某个事件循环中执行，所以处理不到
 
 那么问题来了，如何对这种异常进行检测呢？
 
 node提供了一些自己编写异步方法的原则：
 
-- 必须执行掉入者传入的回调函数
+- 必须执行调用者传入的回调函数
 - 如果发生异常要传递回异常供调用者判断
 
 给出一个的例子：
 
-var interview = function(callback){
-  process.nextTick(function(){
-    var resutlt = something;
-    if(error){
-      callback(error);
-    }else{
-      callback(null,result);
+    var interview = function(callback){
+      process.nextTick(function(){
+        var resutlt = something;
+        if(error){
+          callback(error);
+        }else{
+          callback(null,result);
+        }
+      })
     }
-  })
-}
 
 给出一个读取本地配置文件的示例：
-var fs = require('fs');
-var readLocalSetting = function(callback){
-  //node读取本地文件本来就有个异步方法
-  fs.redFile('/etc/setting', function (err, data) {
-  if (err) callback(err);
-    callback(null,data);
-  });
-}
+    
+    var fs = require('fs');
+    var readLocalSetting = function(callback){
+      //node读取本地文件本来就有个异步方法
+      fs.redFile('/etc/setting', function (err, data) {
+      if (err) callback(err);
+        callback(null,data);
+      });
+    }
+2. 函数嵌套太深
 
+- 假想如下一种情况，如果你需要写一个爬虫，爬取40个页面的数据，当所有数据都返回之后一起返回给调用者。
 
+- 假象如下另一种情况，如果你访问两个接口，B 接口依赖于A接口的数据，只有当A接口数据返回之后再去访问B接口的数据，这样的层层嵌套导致代码丑的一逼。（比如有三层嵌套）
 
+那么该如何处理呢？
 
+对于第一种情况，你可以设定一个变量值，每个访问请求成功时变量值加一，同时对该变量值进行检查，如果所有的请求都已返回，则返回给调用者。
+当然 node 中有很多第三方调用者可以实现同样的效果。比如 Eventproxy 可以更优雅的使用
 
+对于第二种情况，使用 promise ,后面的笔记会进一步讲解，这里做分析。
 
+3. 阻塞代码
 
+这其实是 javascript 的劣势，没有线程休眠的API，只能使用 `setTimeout` 和  `setInterval` 两个定时器替代，但这两个函数在并不能阻止后续代码的执行，因为它并不是线程休眠，而仅仅是两个定时器，在规定的时间到了，将事件插入到队列中的定时器，想要实现线程休眠的功能需要另寻它法：
 
+示例一：
 
+    //TODO
+    var start = new Date();
+    while(new Date() - start < 1000){
+    }
+    //如上在这个时间间隔内让线程（单线程）一直处于循环之中，这样可以暂时占用线程，假线程休眠
 
+如上的示例只适用于前端的假线程休眠，因为只有自己，所以不会影响到他人，但是在后端 node 中如果使用这种方式的话，完全会破坏掉 node 的事件循环机制，导致所有人的访问请求无法响应，这是可怕的
+
+那么 node 中该如何处理呢，只好在统一业务逻辑后，全部写到 `setTimeout` 的函数参数中
+
+4. 多线程编程
+
+前端 javascript 的单线程指的是逻辑线程和 UI 渲染共用一个线程，然后 node 不存在此问题，所以只有逻辑处理一个线程，但是node借鉴前端中 `web workers` 的经验，给出了`child process` 这个基础API，使 node 也可以进行多线程编程。
+
+5.  异步转同步
+
+如上所述，大多数人仍然习惯同步编程的思维，或者某些情况下我们需要同步编程的考虑，这时候该如何处理？
+
+node 自己提供了一部分同步的API，如 ｀fs.readFileSync(filename, [options])｀,但是仍然满足不了我们的需求，可以寻求第三方库的帮助。
 
 
